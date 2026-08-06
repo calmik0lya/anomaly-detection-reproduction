@@ -17,6 +17,8 @@ patchcore_params.pkl
 
 # Heavy run outputs (keep only the small metrics/csv/txt summaries manually)
 /experiments/
+patchcore-inspection/results_*/
+SimpleNet/results_*/
 padim_run/results/**/weights/
 padim_run/results/**/images/
 patchcore-inspection/results_bottle/**/models/

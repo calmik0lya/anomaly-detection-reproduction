@@ -1,6 +1,5 @@
 source:
-  type: json
-  path: metrics.json
-  fields:
-    image_auroc: image_AUROC
-    pixel_auroc: pixel_AUROC
+  type: regex_stdout
+  patterns:
+    image_auroc: '===RUN_PY_PADIM_METRICS===[\s\S]*?"image_AUROC":\s*([\d.]+)'
+    pixel_auroc: '===RUN_PY_PADIM_METRICS===[\s\S]*?"pixel_AUROC":\s*([\d.]+)'

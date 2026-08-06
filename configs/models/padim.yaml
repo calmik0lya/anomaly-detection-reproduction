@@ -4,14 +4,15 @@ working_dir: padim_run
 script: run_padim.py
 env: {}
 
-# Эти значения пока зашиты в padim_run/run_padim.py и приведены справочно.
-hardcoded_reference:
-  backbone: resnet18
-  layers_to_extract_from: [layer1, layer2, layer3]
-  train_batch_size: 32
-  eval_batch_size: 32
-  num_workers: 0
-  max_epochs: 1
+backbone: resnet18
+layers_to_extract_from: [layer1, layer2, layer3]
+train_batch_size: 32
+eval_batch_size: 32
+num_workers: 0
+epochs: 1
+accelerator: cpu
+devices: 1
+results_dir: results
 
 weight_glob:
   - "results/Padim/MVTecAD/{category}/latest/weights/lightning/*.ckpt"

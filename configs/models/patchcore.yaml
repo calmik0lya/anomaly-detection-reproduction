@@ -14,6 +14,7 @@ layers_to_extract_from: [layer2, layer3]
 pretrain_embed_dimension: 1024
 target_embed_dimension: 1024
 anomaly_scorer_num_nn: 1
+faiss_num_workers: 1
 patchsize: 3
 sampler: approx_greedy_coreset
 sampler_percentage: 0.1

@@ -155,7 +155,29 @@ def collect_weight_files(cwd, weight_glob, fmt):
     for pattern in weight_glob:
         resolved = pattern.format(**fmt)
         files.extend(m for m in glob.glob(os.path.join(cwd, resolved)) if os.path.isfile(m))
-    return sorted(set(files))
+    return sorted({os.path.realpath(path) for path in files})
+
+
+def next_iterated_log_group(cwd, results_dir, log_project, log_group):
+    """Повторяет mode=iterate из PatchCore и возвращает папку нового запуска."""
+    project_dir = os.path.join(cwd, results_dir, log_project)
+    candidate = log_group
+    counter = 0
+    while os.path.exists(os.path.join(project_dir, candidate)):
+        candidate = f"{log_group}_{counter}"
+        counter += 1
+    return candidate
+
+
+def next_available_run_name(cwd, results_dir, log_project, log_group, run_name):
+    """Возвращает свободное имя запуска для SimpleNet mode=overwrite."""
+    group_dir = os.path.join(cwd, results_dir, log_project, log_group)
+    candidate = run_name
+    counter = 0
+    while os.path.exists(os.path.join(group_dir, candidate)):
+        candidate = f"{run_name}_{counter}"
+        counter += 1
+    return candidate
 
 
 def save_experiment(model_name, category, config, metrics, cwd, fmt, timestamp,
@@ -206,7 +228,11 @@ def run_patchcore(config, py, mvtec_path, dry_run):
     category = config["category"]
     log_group = config["log_group_template"].format(category=category)
     results_dir = config["results_dir_template"].format(category=category)
-    fmt = dict(config, category=category, log_group=log_group, results_dir=results_dir)
+    output_log_group = next_iterated_log_group(
+        cwd, results_dir, config["log_project"], log_group,
+    )
+    fmt = dict(config, category=category, log_group=output_log_group,
+               results_dir=results_dir)
 
     cmd = [py, config["script"], "--seed", str(config["seed"])]
     if config.get("save_patchcore_model"):
@@ -218,6 +244,7 @@ def run_patchcore(config, py, mvtec_path, dry_run):
     cmd += ["--pretrain_embed_dimension", str(config["pretrain_embed_dimension"]),
             "--target_embed_dimension", str(config["target_embed_dimension"]),
             "--anomaly_scorer_num_nn", str(config["anomaly_scorer_num_nn"]),
+            "--faiss_num_workers", str(config["faiss_num_workers"]),
             "--patchsize", str(config["patchsize"]),
             "sampler", "-p", str(config["sampler_percentage"]), config["sampler"],
             "dataset", "--num_workers", str(config["num_workers"]),
@@ -230,20 +257,43 @@ def run_patchcore(config, py, mvtec_path, dry_run):
     return cwd, fmt, metrics
 
 
-def run_padim(config, py, dry_run):
+def run_padim(config, py, mvtec_path, dry_run):
     cwd = os.path.join(ROOT, config["working_dir"])
     category = config["category"]
-    if category != "bottle":
-        raise ValueError(
-            "run_padim.py сейчас поддерживает только category=bottle (категория и путь "
-            "к датасету зашиты внутри скрипта, а не читаются из конфига). Чтобы прогнать "
-            "другую категорию, нужно поправить эти строки в padim_run/run_padim.py вручную."
-        )
     fmt = dict(config, category=category)
     env = dict(BASE_ENV, **config.get("env", {}))
-    cmd = [py, config["script"]]
-    run_cmd(cmd, cwd, env, dry_run)
-    metrics = None if dry_run else parse_metrics(config["metrics_source"], cwd, fmt, None)
+    results_dir = os.path.join(cwd, config["results_dir"])
+    code = f"""
+import json
+from anomalib.data import MVTecAD
+from anomalib.models import Padim
+from anomalib.engine import Engine
+
+datamodule = MVTecAD(
+    root={mvtec_path!r},
+    category={category!r},
+    train_batch_size={config['train_batch_size']},
+    eval_batch_size={config['eval_batch_size']},
+    num_workers={config['num_workers']},
+)
+model = Padim(
+    backbone={config['backbone']!r},
+    layers={config['layers_to_extract_from']!r},
+)
+engine = Engine(
+    accelerator={config['accelerator']!r},
+    devices={config['devices']},
+    max_epochs={config['epochs']},
+    default_root_dir={results_dir!r},
+)
+engine.fit(model=model, datamodule=datamodule)
+test_results = engine.test(model=model, datamodule=datamodule)
+print("===RUN_PY_PADIM_METRICS===")
+print(json.dumps(test_results, indent=2, default=str))
+"""
+    cmd = [py, "-c", code]
+    stdout = run_cmd(cmd, cwd, env, dry_run)
+    metrics = None if dry_run else parse_metrics(config["metrics_source"], cwd, fmt, stdout)
     return cwd, fmt, metrics
 
 
@@ -278,11 +328,15 @@ def run_simplenet(config, py, mvtec_path, dry_run):
     category = config["category"]
     log_group = config["log_group_template"].format(category=category)
     results_dir = config["results_dir_template"].format(category=category)
-    fmt = dict(config, category=category, log_group=log_group, results_dir=results_dir)
+    run_name = next_available_run_name(
+        cwd, results_dir, config["log_project"], log_group, config["run_name"],
+    )
+    fmt = dict(config, category=category, log_group=log_group,
+               results_dir=results_dir, run_name=run_name)
 
     cmd = [py, config["script"], "--seed", str(config["seed"]),
            "--log_group", log_group, "--log_project", config["log_project"],
-           "--results_path", results_dir, "--run_name", config["run_name"],
+           "--results_path", results_dir, "--run_name", run_name,
            "net", "-b", config["backbone"]]
     for layer in config["layers_to_extract_from"]:
         cmd += ["-le", layer]
@@ -343,10 +397,11 @@ def run_draem(config, py, mvtec_path, dtd_path, action, dry_run):
     # тяжёлые зависимости DRAEM/torch без необходимости).
     code = (
         "import sys, json, io, contextlib; sys.path.insert(0, '.'); "
-        "from test_DRAEM import test; "
+        "import test_DRAEM; "
+        "test_DRAEM.write_results_to_file = lambda *args, **kwargs: None; "
         "buf = io.StringIO()\n"
         "with contextlib.redirect_stdout(buf):\n"
-        f"    test(['{category}'], '{mvtec_path}/', '{checkpoint_path}', "
+        f"    test_DRAEM.test(['{category}'], '{mvtec_path}/', '{checkpoint_path}', "
         f"'{base_model_name}')\n"
         "print('===RUN_PY_CAPTURE_START===')\n"
         "print(buf.getvalue())\n"
@@ -363,7 +418,7 @@ RUNNERS = {
         config, paths["python_envs"][config["python_env"]], paths["mvtec_path"], dry_run
     ),
     "padim": lambda config, paths, action, dry_run: run_padim(
-        config, paths["python_envs"][config["python_env"]], dry_run
+        config, paths["python_envs"][config["python_env"]], paths["mvtec_path"], dry_run
     ),
     "stfpm": lambda config, paths, action, dry_run: run_stfpm(
         config, paths["python_envs"][config["python_env"]], paths["mvtec_path"], action, dry_run
