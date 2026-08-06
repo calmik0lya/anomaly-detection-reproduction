@@ -40,7 +40,9 @@ python run.py --config configs/draem.yaml --category carpet --action test
 `experiments/<model>__<category>__<timestamp>/`:
 - `config.yaml` — использованный конфиг
 - `metrics.json` — метрики из results.csv/лога модели
-- `weights/` — веса, найденные по `weight_glob` (если модель дообучилась)
+- `weights/` — только файлы весов, найденные по `weight_glob`, без лишних вложенных папок
+
+`experiments/` хранится локально и исключён из Git, как и тяжёлые outputs/checkpoints в типовых ML-проектах. Исходные конфиги из `configs/` остаются в репозитории.
 
 Сводка по всем моделям — в `results.md`.
 

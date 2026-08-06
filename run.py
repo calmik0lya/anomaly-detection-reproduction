@@ -125,13 +125,28 @@ def save_experiment(model_name, category, config, metrics, cwd, fmt, timestamp):
     with open(os.path.join(exp_dir, "metrics.json"), "w") as f:
         json.dump(metrics or {}, f, indent=2, ensure_ascii=False)
 
+    # Папка эксперимента должна быть самодостаточной и легко читаемой: файлы
+    # весов складываются непосредственно в weights/, без копирования длинного
+    # дерева results_*/project/group/models/... исходной модели.
+    weights_dir = os.path.join(exp_dir, "weights")
+    os.makedirs(weights_dir, exist_ok=True)
+
     weight_files = collect_weight_files(cwd, config.get("weight_glob", []), fmt)
     if weight_files:
-        weights_dir = os.path.join(exp_dir, "weights")
+        used_names = set()
         for src in weight_files:
-            dst = os.path.join(weights_dir, os.path.relpath(src, cwd))
-            os.makedirs(os.path.dirname(dst), exist_ok=True)
-            shutil.copy2(src, dst)
+            filename = os.path.basename(src)
+            if filename in used_names:
+                parent = os.path.basename(os.path.dirname(src))
+                filename = f"{parent}__{filename}"
+            suffix = 2
+            candidate = filename
+            while candidate in used_names:
+                stem, ext = os.path.splitext(filename)
+                candidate = f"{stem}__{suffix}{ext}"
+                suffix += 1
+            used_names.add(candidate)
+            shutil.copy2(src, os.path.join(weights_dir, candidate))
         print(f"[run.py] Скопировано файлов весов: {len(weight_files)}")
     else:
         print("[run.py] Файлы весов по weight_glob не найдены (возможно, dry-run "

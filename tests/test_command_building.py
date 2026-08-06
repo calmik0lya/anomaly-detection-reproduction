@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import run as run_module
 
@@ -46,3 +47,34 @@ def test_run_stfpm_action_train_only_runs_train_command(capsys):
     assert "main.py train" in printed
     assert "--epochs 7" in printed
     assert "main.py test" not in printed
+
+
+def test_save_experiment_has_only_config_metrics_and_flat_weights(tmp_path, monkeypatch):
+    model_dir = tmp_path / "model"
+    first_dir = model_dir / "results" / "run_a"
+    second_dir = model_dir / "results" / "run_b"
+    first_dir.mkdir(parents=True)
+    second_dir.mkdir(parents=True)
+    (first_dir / "model.ckpt").write_text("first")
+    (second_dir / "model.ckpt").write_text("second")
+
+    experiments_dir = tmp_path / "experiments"
+    monkeypatch.setattr(run_module, "EXPERIMENTS_DIR", str(experiments_dir))
+    config = {
+        "model": "example",
+        "category": "bottle",
+        "weight_glob": ["results/*/*.ckpt"],
+    }
+
+    exp_dir = Path(run_module.save_experiment(
+        "example", "bottle", config, {"image_auroc": 0.9},
+        str(model_dir), config, "20260806_120000",
+    ))
+
+    assert {path.name for path in exp_dir.iterdir()} == {
+        "config.yaml", "metrics.json", "weights",
+    }
+    weight_paths = list((exp_dir / "weights").iterdir())
+    assert len(weight_paths) == 2
+    assert all(path.is_file() for path in weight_paths)
+    assert not any(path.is_dir() for path in weight_paths)
