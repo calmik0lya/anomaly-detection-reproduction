@@ -1,0 +1,46 @@
+# Конфиг для SimpleNet/main.py
+model: simplenet
+python_env: patchcore          # ключ из configs/paths.yaml -> python_envs
+working_dir: SimpleNet
+script: main.py
+
+category: bottle
+seed: 0
+epochs: 10                     # --meta_epochs
+
+log_project: MVTecAD_Results
+log_group_template: "simplenet_{category}"
+results_dir_template: "results_{category}"
+run_name: run
+
+backbone: wideresnet50
+layers_to_extract_from: [layer2, layer3]
+pretrain_embed_dimension: 1536
+target_embed_dimension: 1536
+patchsize: 3
+embedding_size: 256
+gan_epochs: 4
+noise_std: 0.015
+dsc_hidden: 1024
+dsc_layers: 2
+dsc_margin: 0.5
+pre_proj: 1
+
+num_workers: 0
+batch_size: 8
+resize: 256
+imagesize: 224
+
+env: {}
+
+# Откуда парсить метрики после запуска (main.py сам пишет results.csv).
+metrics_source:
+  type: csv
+  path_template: "{results_dir}/{log_project}/{log_group}/{run_name}/results.csv"
+
+# Куда SimpleNet.train()/test() реально кладут веса (см. SimpleNet/simplenet.py,
+# set_model_dir + ckpt_path): {results_dir}/{log_project}/{log_group}/{run_name}/models/<i>/mvtec_{category}/
+# -> ckpt.pth (дискриминатор/pre_projection), models.ckpt (энкодер/декодер, если есть).
+weight_glob:
+  - "{results_dir}/{log_project}/{log_group}/{run_name}/models/*/mvtec_{category}/ckpt.pth"
+  - "{results_dir}/{log_project}/{log_group}/{run_name}/models/*/mvtec_{category}/models.ckpt"

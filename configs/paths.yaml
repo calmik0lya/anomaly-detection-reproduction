@@ -1,0 +1,9 @@
+# Общие пути: датасет и питон-окружения для всех моделей.
+# Пути к моделям читают конфиги моделей полем python_env (ключ из python_envs ниже).
+
+mvtec_path: ~/anomaly_local_data/mvtec
+dtd_images_path: ~/anomaly_local_data/dtd/images
+
+python_envs:
+  patchcore: /opt/anaconda3/envs/patchcore/bin/python
+  anomalib: /opt/anaconda3/envs/anomalib/bin/python
