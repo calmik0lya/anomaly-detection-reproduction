@@ -45,12 +45,29 @@ python run.py --config configs/models/draem.yaml --category carpet --action test
 `--category`, `--epochs`, `--action` переопределяют собранный конфиг, а `--dry-run`
 печатает команду без запуска.
 
+Параметры PaDiM (путь к MVTec AD, category, backbone, layers, batch size и epochs)
+также берутся из YAML, несмотря на отдельное окружение `anomalib`.
+
 ## Результаты запусков
 
+После успешного реального запуска создаётся
 `experiments/<model>__<category>__<timestamp>/`:
+
+```text
+experiments/stfpm__bottle__20260806_194545/
+├── config.yaml
+├── metrics.json
+└── weights/
+    └── best.pth.tar
+```
+
 - `config.yaml` — полностью собранный конфиг (`task/model/metrics/runner/paths`)
 - `metrics.json` — метрики из results.csv/лога модели
 - `weights/` — только файлы весов, найденные по `weight_glob`, без лишних вложенных папок
+
+При `--dry-run` или ошибке модели ложный успешный эксперимент не создаётся. Для
+`--action train` без последующего тестирования `metrics.json` остаётся пустым до
+получения итоговых метрик.
 
 `experiments/` хранится локально и исключён из Git, как и тяжёлые outputs/checkpoints в типовых ML-проектах. Исходные конфиги из `configs/` остаются в репозитории.
 
