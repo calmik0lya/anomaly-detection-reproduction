@@ -1,0 +1,7 @@
+# Корневой составной конфиг. Имена соответствуют YAML-файлам в группах ниже.
+defaults:
+  task: anomaly_detection
+  model: patchcore
+  metrics: patchcore
+  runner: default
+  paths: local

@@ -1,0 +1,11 @@
+name: stfpm
+python_env: patchcore
+working_dir: STFPM
+script: main.py
+
+epochs: 100
+model_save_path: snapshots
+env: {}
+
+weight_glob:
+  - "{model_save_path}/{category}/best.pth.tar"

@@ -1,0 +1,7 @@
+# Локальные пути к данным и двум Python-окружениям.
+mvtec_path: ~/anomaly_local_data/mvtec
+dtd_images_path: ~/anomaly_local_data/dtd/images
+
+python_envs:
+  patchcore: /opt/anaconda3/envs/patchcore/bin/python
+  anomalib: /opt/anaconda3/envs/anomalib/bin/python

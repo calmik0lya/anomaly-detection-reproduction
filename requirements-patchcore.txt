@@ -1,4 +1,4 @@
-# Зависимости для conda-окружения "patchcore" (см. configs/paths.yaml,
+# Зависимости для conda-окружения "patchcore" (см. configs/paths/local.yaml,
 # python_envs.patchcore) — в нём запускаются patchcore-inspection/,
 # SimpleNet/, STFPM/ и DRAEM/ (configs/{patchcore,simplenet,stfpm,draem}.yaml).
 torch>=1.10.0

@@ -1,0 +1,4 @@
+source:
+  type: regex_stdout
+  pattern: 'Pixel-AUC:\s*([\d.]+)\s*Image-AUC:\s*([\d.]+)\s*PRO:\s*([\d.]+)'
+  fields: [pixel_auroc, image_auroc, pro_auroc]

@@ -7,7 +7,10 @@ ROOT = run_module.ROOT
 
 
 def test_run_patchcore_substitutes_config_into_command(capsys):
-    config = run_module.load_yaml(os.path.join(ROOT, "configs", "patchcore.yaml"))
+    resolved = run_module.load_experiment_config(
+        os.path.join(ROOT, "configs", "models", "patchcore.yaml")
+    )
+    config = run_module.flatten_experiment_config(resolved)
     config["category"] = "cable"  # проверяем, что подстановка реально идёт из конфига,
     config["patchsize"] = 5       # а не захардкожена
 
@@ -22,7 +25,10 @@ def test_run_patchcore_substitutes_config_into_command(capsys):
 
 
 def test_run_stfpm_action_test_only_runs_test_command(capsys):
-    config = run_module.load_yaml(os.path.join(ROOT, "configs", "stfpm.yaml"))
+    resolved = run_module.load_experiment_config(
+        os.path.join(ROOT, "configs", "models", "stfpm.yaml")
+    )
+    config = run_module.flatten_experiment_config(resolved)
     config["category"] = "carpet"
     config["epochs"] = 42
 
@@ -37,7 +43,10 @@ def test_run_stfpm_action_test_only_runs_test_command(capsys):
 
 
 def test_run_stfpm_action_train_only_runs_train_command(capsys):
-    config = run_module.load_yaml(os.path.join(ROOT, "configs", "stfpm.yaml"))
+    resolved = run_module.load_experiment_config(
+        os.path.join(ROOT, "configs", "models", "stfpm.yaml")
+    )
+    config = run_module.flatten_experiment_config(resolved)
     config["epochs"] = 7
 
     run_module.run_stfpm(config, py="fake-python", mvtec_path="/fake/mvtec",
@@ -61,9 +70,14 @@ def test_save_experiment_has_only_config_metrics_and_flat_weights(tmp_path, monk
     experiments_dir = tmp_path / "experiments"
     monkeypatch.setattr(run_module, "EXPERIMENTS_DIR", str(experiments_dir))
     config = {
-        "model": "example",
-        "category": "bottle",
-        "weight_glob": ["results/*/*.ckpt"],
+        "task": {"category": "bottle"},
+        "model": {
+            "name": "example",
+            "weight_glob": ["results/*/*.ckpt"],
+        },
+        "metrics": {"source": {"type": "json"}},
+        "runner": {"output_dir": "experiments"},
+        "paths": {},
     }
 
     exp_dir = Path(run_module.save_experiment(
@@ -74,6 +88,10 @@ def test_save_experiment_has_only_config_metrics_and_flat_weights(tmp_path, monk
     assert {path.name for path in exp_dir.iterdir()} == {
         "config.yaml", "metrics.json", "weights",
     }
+    saved_config = run_module.load_yaml(exp_dir / "config.yaml")
+    assert set(saved_config) == {"task", "model", "metrics", "runner", "paths"}
+    assert saved_config["model"]["name"] == "example"
+    assert saved_config["metrics"]["source"]["type"] == "json"
     weight_paths = list((exp_dir / "weights").iterdir())
     assert len(weight_paths) == 2
     assert all(path.is_file() for path in weight_paths)

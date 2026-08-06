@@ -4,8 +4,14 @@
 
 ```
 .
-├── run.py                    # python run.py --config configs/<model>.yaml
-├── configs/                  # paths.yaml + конфиг на модель
+├── run.py                    # сборка YAML-конфигов и запуск моделей
+├── configs/
+│   ├── config.yaml          # группы по умолчанию
+│   ├── models/              # гиперпараметры и веса каждой модели
+│   ├── tasks/               # постановка anomaly detection
+│   ├── metrics/             # источники и парсинг метрик
+│   ├── runner/              # параметры папки экспериментов
+│   └── paths/               # датасеты и Python-окружения
 ├── experiments/               # результаты запусков: config/metrics/weights
 ├── tests/                     # pytest
 ├── requirements*.txt
@@ -23,22 +29,26 @@
 - `patchcore` — PatchCore, STFPM, SimpleNet, DRAEM
 - `anomalib` — PaDiM (свой тяжёлый стек: pytorch-lightning, kornia)
 
-Пути к интерпретаторам — в `configs/paths.yaml`, `run.py` вызывает их сам.
+Пути к интерпретаторам — в `configs/paths/local.yaml`, `run.py` вызывает их сам.
 
 ## Запуск
 
 ```bash
-python run.py --config configs/patchcore.yaml
-python run.py --config configs/stfpm.yaml --epochs 50
-python run.py --config configs/draem.yaml --category carpet --action test
+python run.py --config configs/config.yaml
+python run.py --config configs/models/patchcore.yaml
+python run.py --config configs/models/stfpm.yaml --epochs 50
+python run.py --config configs/models/draem.yaml --category carpet --action test
 ```
 
-`--category`, `--epochs`, `--action` переопределяют конфиг. `--dry-run` печатает команду без запуска.
+`configs/config.yaml` выбирает группы по умолчанию. Переданный файл из `configs/models/`
+заменяет модель и подключает одноимённый конфиг из `configs/metrics/`.
+`--category`, `--epochs`, `--action` переопределяют собранный конфиг, а `--dry-run`
+печатает команду без запуска.
 
 ## Результаты запусков
 
 `experiments/<model>__<category>__<timestamp>/`:
-- `config.yaml` — использованный конфиг
+- `config.yaml` — полностью собранный конфиг (`task/model/metrics/runner/paths`)
 - `metrics.json` — метрики из results.csv/лога модели
 - `weights/` — только файлы весов, найденные по `weight_glob`, без лишних вложенных папок
 
@@ -58,6 +68,7 @@ pip install -r requirements.txt
 pytest
 ```
 
-Проверяют валидность `configs/*.yaml` и корректность подстановки параметров в команду — без GPU и датасета.
+Проверяют валидность всех групп в `configs/`, композицию полного конфига для каждой
+модели и корректность подстановки параметров в команду — без GPU и датасета.
 
 Открытые задачи — в `TODO.md`.

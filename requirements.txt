@@ -1,6 +1,6 @@
 # Зависимости самого run.py (оркестратора) и тестов в tests/.
 # Модели запускаются в отдельных conda-окружениях — см.
 # requirements-patchcore.txt и requirements-anomalib.txt, а также
-# configs/paths.yaml (python_envs).
+# configs/paths/local.yaml (python_envs).
 PyYAML>=6.0
 pytest>=7.4

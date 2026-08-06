@@ -1,0 +1,5 @@
+source:
+  type: regex_stdout
+  patterns:
+    image_auroc: 'AUC Image:\s*([\d.]+)'
+    pixel_auroc: 'AUC Pixel:\s*([\d.]+)'

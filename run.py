@@ -7,18 +7,18 @@ SimpleNet/, DRAEM/) — просто вызывает те же самые ко�
 использовались для получения результатов, и вытаскивает метрики из тех же
 файлов/логов, куда модели сами их пишут.
 
-Все параметры запуска (пути, гиперпараметры, epochs и т.д.) лежат в
-YAML-конфигах в configs/ — по одному файлу на модель плюс общий
-configs/paths.yaml с путями к датасету и питон-окружениям.
+Все параметры собираются из групп YAML-конфигов в configs/: models, tasks,
+metrics, runner и paths. Полностью собранный конфиг сохраняется с каждым
+экспериментом.
 
 После каждого запуска run.py сохраняет использованный конфиг, метрики и
 найденные файлы весов в experiments/<model>__<category>__<timestamp>/.
 
 Использование:
-    python run.py --config configs/patchcore.yaml
-    python run.py --config configs/stfpm.yaml --epochs 100
-    python run.py --config configs/draem.yaml --epochs 8 --action test
-    python run.py --config configs/patchcore.yaml --dry-run   # только показать команду
+    python run.py --config configs/models/patchcore.yaml
+    python run.py --config configs/models/stfpm.yaml --epochs 100
+    python run.py --config configs/models/draem.yaml --epochs 8 --action test
+    python run.py --config configs/config.yaml --dry-run   # модель по умолчанию: PatchCore
 """
 import argparse
 import csv
@@ -43,6 +43,49 @@ BASE_ENV = dict(os.environ, KMP_DUPLICATE_LIB_OK="TRUE")
 def load_yaml(path):
     with open(path) as f:
         return yaml.safe_load(f)
+
+
+CONFIG_GROUP_DIRS = {
+    "task": "tasks",
+    "model": "models",
+    "metrics": "metrics",
+    "runner": "runner",
+    "paths": "paths",
+}
+
+
+def load_experiment_config(config_path):
+    """Собирает полный конфиг из групп, перечисленных в configs/config.yaml.
+
+    Если передан файл из configs/models/, он заменяет модель по умолчанию и
+    автоматически выбирает одноимённый конфиг метрик.
+    """
+    root_config_path = os.path.join(CONFIGS_DIR, "config.yaml")
+    root_config = load_yaml(root_config_path)
+    defaults = dict(root_config["defaults"])
+
+    requested_path = os.path.abspath(config_path)
+    if requested_path != os.path.abspath(root_config_path):
+        requested_model = load_yaml(requested_path)
+        model_name = requested_model["name"]
+        defaults["model"] = model_name
+        defaults["metrics"] = model_name
+
+    resolved = {}
+    for group, directory in CONFIG_GROUP_DIRS.items():
+        name = defaults[group]
+        group_path = os.path.join(CONFIGS_DIR, directory, f"{name}.yaml")
+        resolved[group] = load_yaml(group_path)
+    return resolved
+
+
+def flatten_experiment_config(config):
+    """Адаптирует составной конфиг к существующим функциям запуска моделей."""
+    flat = dict(config["model"])
+    flat["model"] = flat.pop("name")
+    flat.update(config["task"])
+    flat["metrics_source"] = config["metrics"]["source"]
+    return flat
 
 
 def run_cmd(cmd, cwd, env, dry_run):
@@ -115,8 +158,10 @@ def collect_weight_files(cwd, weight_glob, fmt):
     return sorted(set(files))
 
 
-def save_experiment(model_name, category, config, metrics, cwd, fmt, timestamp):
-    exp_dir = os.path.join(EXPERIMENTS_DIR, f"{model_name}__{category}__{timestamp}")
+def save_experiment(model_name, category, config, metrics, cwd, fmt, timestamp,
+                    experiments_dir=None):
+    experiments_dir = experiments_dir or EXPERIMENTS_DIR
+    exp_dir = os.path.join(experiments_dir, f"{model_name}__{category}__{timestamp}")
     os.makedirs(exp_dir, exist_ok=True)
 
     with open(os.path.join(exp_dir, "config.yaml"), "w") as f:
@@ -131,7 +176,8 @@ def save_experiment(model_name, category, config, metrics, cwd, fmt, timestamp):
     weights_dir = os.path.join(exp_dir, "weights")
     os.makedirs(weights_dir, exist_ok=True)
 
-    weight_files = collect_weight_files(cwd, config.get("weight_glob", []), fmt)
+    model_config = config.get("model", config)
+    weight_files = collect_weight_files(cwd, model_config.get("weight_glob", []), fmt)
     if weight_files:
         used_names = set()
         for src in weight_files:
@@ -335,7 +381,7 @@ RUNNERS = {
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--config", required=True,
-                         help="путь к YAML-конфигу модели, например configs/patchcore.yaml")
+                         help="путь к YAML-конфигу модели, например configs/models/patchcore.yaml")
     parser.add_argument("--category", default=None, help="переопределить category из конфига")
     parser.add_argument("--epochs", type=int, default=None,
                          help="переопределить epochs из конфига (stfpm/simplenet/draem)")
@@ -346,16 +392,21 @@ def main():
                          help="только показать команду, которая будет вызвана, ничего не запускать")
     args = parser.parse_args()
 
-    config = load_yaml(args.config)
-    paths = load_yaml(os.path.join(CONFIGS_DIR, "paths.yaml"))
+    resolved_config = load_experiment_config(args.config)
+    config = flatten_experiment_config(resolved_config)
+    paths = resolved_config["paths"]
     paths = dict(paths, mvtec_path=os.path.expanduser(paths["mvtec_path"]),
                  dtd_images_path=os.path.expanduser(paths["dtd_images_path"]))
+    resolved_config["paths"] = paths
 
     if args.category:
         config["category"] = args.category
+        resolved_config["task"]["category"] = args.category
     if args.epochs is not None:
         config["epochs"] = args.epochs
-    action = args.action or config.get("action", "all")
+        resolved_config["model"]["epochs"] = args.epochs
+    action = args.action or resolved_config["task"].get("action", "all")
+    resolved_config["task"]["action"] = action
 
     model_name = config["model"]
     if model_name not in RUNNERS:
@@ -369,7 +420,11 @@ def main():
 
     if not args.dry_run:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        exp_dir = save_experiment(model_name, config["category"], config, metrics, cwd, fmt, timestamp)
+        experiments_dir = os.path.join(ROOT, resolved_config["runner"]["output_dir"])
+        exp_dir = save_experiment(
+            model_name, config["category"], resolved_config, metrics, cwd, fmt,
+            timestamp, experiments_dir=experiments_dir,
+        )
         print(f"\n[run.py] Эксперимент сохранён в {exp_dir}")
 
 

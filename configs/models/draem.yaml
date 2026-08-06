@@ -1,0 +1,33 @@
+name: draem
+python_env: patchcore
+working_dir: DRAEM
+train_script: train_DRAEM.py
+
+epochs: 8
+lr: 0.0001
+bs: 8
+checkpoint_path: checkpoints
+log_path: logs
+env: {}
+
+# Порядок категорий из obj_batch в train_DRAEM.py нужен для вычисления obj_id.
+obj_list:
+  - capsule
+  - bottle
+  - carpet
+  - leather
+  - pill
+  - transistor
+  - tile
+  - cable
+  - zipper
+  - toothbrush
+  - metal_nut
+  - hazelnut
+  - screw
+  - grid
+  - wood
+
+weight_glob:
+  - "{checkpoint_path}/{run_name}.pckl"
+  - "{checkpoint_path}/{run_name}_seg.pckl"

@@ -1,0 +1,6 @@
+source:
+  type: json
+  path: metrics.json
+  fields:
+    image_auroc: image_AUROC
+    pixel_auroc: pixel_AUROC
