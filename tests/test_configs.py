@@ -73,6 +73,14 @@ def test_default_config_composes_patchcore():
 
 
 def test_paths_config_has_required_fields():
-    paths = load_yaml(os.path.join(CONFIGS_DIR, "paths", "local.yaml"))
-    assert {"mvtec_path", "dtd_images_path", "python_envs"} <= set(paths)
-    assert {"patchcore", "anomalib"} <= set(paths["python_envs"])
+    for name in ("local.yaml", "kaggle.yaml"):
+        paths = load_yaml(os.path.join(CONFIGS_DIR, "paths", name))
+        assert {"mvtec_path", "dtd_images_path", "python_envs"} <= set(paths)
+        assert {"patchcore", "anomalib"} <= set(paths["python_envs"])
+
+
+def test_task_lists_all_mvtec_categories():
+    task = load_yaml(os.path.join(CONFIGS_DIR, "tasks", "anomaly_detection.yaml"))
+    assert len(task["categories"]) == 15
+    assert len(set(task["categories"])) == 15
+    assert task["category"] in task["categories"]

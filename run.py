@@ -54,7 +54,7 @@ CONFIG_GROUP_DIRS = {
 }
 
 
-def load_experiment_config(config_path):
+def load_experiment_config(config_path, paths_path=None):
     """Собирает полный конфиг из групп, перечисленных в configs/config.yaml.
 
     Если передан файл из configs/models/, он заменяет модель по умолчанию и
@@ -76,6 +76,8 @@ def load_experiment_config(config_path):
         name = defaults[group]
         group_path = os.path.join(CONFIGS_DIR, directory, f"{name}.yaml")
         resolved[group] = load_yaml(group_path)
+    if paths_path:
+        resolved["paths"] = load_yaml(os.path.abspath(paths_path))
     return resolved
 
 
@@ -86,6 +88,23 @@ def flatten_experiment_config(config):
     flat.update(config["task"])
     flat["metrics_source"] = config["metrics"]["source"]
     return flat
+
+
+def apply_device_override(config, device):
+    """Применяет единый выбор CPU/GPU к разным интерфейсам пяти моделей."""
+    if device == "auto":
+        return
+
+    use_cuda = device == "cuda"
+    model_name = config["model"]
+    if model_name in {"patchcore", "simplenet"}:
+        config["gpu"] = [0] if use_cuda else []
+    elif model_name == "padim":
+        config["accelerator"] = "gpu" if use_cuda else "cpu"
+        config["devices"] = 1
+    elif model_name == "draem":
+        config["gpu_id"] = 0
+    # STFPM и DRAEM выбирают CUDA через torch.cuda.is_available().
 
 
 def run_cmd(cmd, cwd, env, dry_run):
@@ -235,6 +254,8 @@ def run_patchcore(config, py, mvtec_path, dry_run):
                results_dir=results_dir)
 
     cmd = [py, config["script"], "--seed", str(config["seed"])]
+    for gpu_id in config.get("gpu", []):
+        cmd += ["--gpu", str(gpu_id)]
     if config.get("save_patchcore_model"):
         cmd.append("--save_patchcore_model")
     cmd += ["--log_group", log_group, "--log_project", config["log_project"], results_dir,
@@ -338,6 +359,12 @@ def run_simplenet(config, py, mvtec_path, dry_run):
            "--log_group", log_group, "--log_project", config["log_project"],
            "--results_path", results_dir, "--run_name", run_name,
            "net", "-b", config["backbone"]]
+    if config.get("gpu"):
+        insertion_point = cmd.index("net")
+        gpu_args = []
+        for gpu_id in config["gpu"]:
+            gpu_args += ["--gpu", str(gpu_id)]
+        cmd[insertion_point:insertion_point] = gpu_args
     for layer in config["layers_to_extract_from"]:
         cmd += ["-le", layer]
     cmd += ["--pretrain_embed_dimension", str(config["pretrain_embed_dimension"]),
@@ -380,6 +407,7 @@ def run_draem(config, py, mvtec_path, dtd_path, action, dry_run):
     if action in ("train", "all"):
         train_cmd = [py, config["train_script"], "--obj_id", str(obj_id), "--bs", str(bs),
                      "--lr", str(lr), "--epochs", str(epochs),
+                     "--gpu_id", str(config.get("gpu_id", 0)),
                      "--data_path", mvtec_path + "/", "--anomaly_source_path", dtd_path,
                      "--checkpoint_path", checkpoint_path, "--log_path", config["log_path"]]
         run_cmd(train_cmd, cwd, env, dry_run)
@@ -437,6 +465,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--config", required=True,
                          help="путь к YAML-конфигу модели, например configs/models/patchcore.yaml")
+    parser.add_argument("--paths", default=None,
+                        help="переопределить конфиг путей, например configs/paths/kaggle.yaml")
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto",
+                        help="единый выбор устройства для модели")
+    parser.add_argument("--output-dir", default=None,
+                        help="папка экспериментов; абсолютная или относительно репозитория")
     parser.add_argument("--category", default=None, help="переопределить category из конфига")
     parser.add_argument("--epochs", type=int, default=None,
                          help="переопределить epochs из конфига (stfpm/simplenet/draem)")
@@ -447,12 +481,18 @@ def main():
                          help="только показать команду, которая будет вызвана, ничего не запускать")
     args = parser.parse_args()
 
-    resolved_config = load_experiment_config(args.config)
+    resolved_config = load_experiment_config(args.config, args.paths)
     config = flatten_experiment_config(resolved_config)
     paths = resolved_config["paths"]
-    paths = dict(paths, mvtec_path=os.path.expanduser(paths["mvtec_path"]),
-                 dtd_images_path=os.path.expanduser(paths["dtd_images_path"]))
+    paths = dict(paths, mvtec_path=os.path.expandvars(os.path.expanduser(paths["mvtec_path"])),
+                 dtd_images_path=os.path.expandvars(os.path.expanduser(paths["dtd_images_path"])))
     resolved_config["paths"] = paths
+
+    apply_device_override(config, args.device)
+    for key in ("gpu", "accelerator", "devices", "gpu_id"):
+        if key in config:
+            resolved_config["model"][key] = config[key]
+    resolved_config["runner"]["device"] = args.device
 
     if args.category:
         config["category"] = args.category
@@ -475,7 +515,9 @@ def main():
 
     if not args.dry_run:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        experiments_dir = os.path.join(ROOT, resolved_config["runner"]["output_dir"])
+        output_dir = args.output_dir or resolved_config["runner"]["output_dir"]
+        resolved_config["runner"]["output_dir"] = output_dir
+        experiments_dir = output_dir if os.path.isabs(output_dir) else os.path.join(ROOT, output_dir)
         exp_dir = save_experiment(
             model_name, config["category"], resolved_config, metrics, cwd, fmt,
             timestamp, experiments_dir=experiments_dir,

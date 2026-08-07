@@ -25,6 +25,30 @@ def test_run_patchcore_substitutes_config_into_command(capsys):
     assert "--pretrain_embed_dimension 1024" in printed
 
 
+def test_cuda_override_adds_gpu_to_patchcore_command(capsys):
+    resolved = run_module.load_experiment_config(
+        os.path.join(ROOT, "configs", "models", "patchcore.yaml")
+    )
+    config = run_module.flatten_experiment_config(resolved)
+    run_module.apply_device_override(config, "cuda")
+
+    run_module.run_patchcore(config, py="python", mvtec_path="/mvtec", dry_run=True)
+
+    assert "--gpu 0" in capsys.readouterr().out
+
+
+def test_cuda_override_configures_padim_accelerator():
+    resolved = run_module.load_experiment_config(
+        os.path.join(ROOT, "configs", "models", "padim.yaml")
+    )
+    config = run_module.flatten_experiment_config(resolved)
+
+    run_module.apply_device_override(config, "cuda")
+
+    assert config["accelerator"] == "gpu"
+    assert config["devices"] == 1
+
+
 def test_next_iterated_patchcore_log_group(tmp_path):
     project_dir = tmp_path / "results" / "project"
     (project_dir / "group").mkdir(parents=True)

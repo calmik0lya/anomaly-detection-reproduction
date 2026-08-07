@@ -1,10 +1,12 @@
-Воспроизведение пяти методов anomaly detection на MVTec AD (класс bottle): PatchCore, PaDiM, STFPM, SimpleNet, DRAEM. Каждая модель — клон оригинального репозитория с точечными правками под CPU/macOS, логика не переписана. Cреда — Mac без CUDA.
+Воспроизведение пяти методов anomaly detection на 15 категориях MVTec AD: PatchCore, PaDiM, STFPM, SimpleNet, DRAEM. Каждая модель — клон оригинального репозитория с точечными правками, логика моделей не переписана. Локально можно проверять код на CPU/macOS, полные эксперименты рассчитаны на NVIDIA GPU в Kaggle.
 
 ## Структура
 
 ```
 .
 ├── run.py                    # сборка YAML-конфигов и запуск моделей
+├── sweep.py                  # пакетный запуск 15 категорий с resume
+├── kaggle/                   # готовый Kaggle Notebook
 ├── configs/
 │   ├── config.yaml          # группы по умолчанию
 │   ├── models/              # гиперпараметры и веса каждой модели
@@ -45,6 +47,9 @@ python run.py --config configs/models/draem.yaml --category carpet --action test
 `--category`, `--epochs`, `--action` переопределяют собранный конфиг, а `--dry-run`
 печатает команду без запуска.
 
+`--paths` выбирает другой набор путей, `--device cuda` включает GPU через разные
+CLI-интерфейсы моделей, а `--output-dir` задаёт место сохранения экспериментов.
+
 Параметры PaDiM (путь к MVTec AD, category, backbone, layers, batch size и epochs)
 также берутся из YAML, несмотря на отдельное окружение `anomalib`.
 
@@ -72,6 +77,30 @@ experiments/stfpm__bottle__20260806_194545/
 `experiments/` хранится локально и исключён из Git, как и тяжёлые outputs/checkpoints в типовых ML-проектах. Исходные конфиги из `configs/` остаются в репозитории.
 
 Сводка по всем моделям — в `results.md`.
+
+## Kaggle и запуск 15 категорий
+
+Готовый Notebook: [`kaggle/anomaly_detection_mvtec.ipynb`](kaggle/anomaly_detection_mvtec.ipynb).
+В Kaggle нужно включить GPU и подключить два Dataset: MVTec AD и DTD. Notebook
+проверяет CUDA и пути, устанавливает зависимости и сначала запускает одну пару
+PatchCore/bottle.
+
+Полный последовательный запуск:
+
+```bash
+python sweep.py \
+  --paths configs/paths/kaggle.yaml \
+  --device cuda \
+  --output-dir /kaggle/working/experiments \
+  --resume --continue-on-error
+```
+
+`--resume` ищет непустой `metrics.json` и пропускает уже завершённые пары.
+Текущее состояние записывается в `experiments/sweep_state.json`. Из-за лимита
+сессии разумно запускать модели группами, например `--models patchcore padim`,
+сохранять Kaggle Version вместе с output и продолжать той же командой. В новой
+сессии предыдущий output нужно подключить как Dataset; Notebook содержит ячейку,
+которая восстанавливает experiment-папки в `/kaggle/working/experiments`.
 
 ## Зависимости
 
