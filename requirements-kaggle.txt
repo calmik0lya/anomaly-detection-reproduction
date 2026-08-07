@@ -1,0 +1,12 @@
+# Единое окружение Kaggle с поддержкой Tesla P100 (CUDA capability sm_60).
+# Сборки PyTorch 2.8+ в актуальном образе Kaggle могут не содержать sm_60.
+--extra-index-url https://download.pytorch.org/whl/cu126
+
+torch==2.7.1+cu126
+torchvision==0.22.1+cu126
+torchaudio==2.7.1+cu126
+numpy==1.26.4
+
+-r requirements.txt
+-r requirements-patchcore.txt
+-r requirements-anomalib.txt

@@ -81,9 +81,10 @@ experiments/stfpm__bottle__20260806_194545/
 ## Kaggle и запуск 15 категорий
 
 Готовый Notebook: [`kaggle/anomaly_detection_mvtec.ipynb`](kaggle/anomaly_detection_mvtec.ipynb).
-В Kaggle нужно включить GPU и подключить два Dataset: MVTec AD и DTD. Notebook
-проверяет CUDA и пути, устанавливает зависимости и сначала запускает одну пару
-PatchCore/bottle.
+В Kaggle нужно включить GPU и подключить Dataset `ipythonx/mvtec-ad`. DTD нужен
+только перед запуском DRAEM. Notebook устанавливает совместимую с Tesla P100
+сборку PyTorch из `requirements-kaggle.txt`, проверяет CUDA и сначала запускает
+одну пару PatchCore/bottle.
 
 Полный последовательный запуск:
 
@@ -106,6 +107,7 @@ python sweep.py \
 
 - `requirements.txt` — для запуска `run.py` и тестов (PyYAML, pytest)
 - `requirements-patchcore.txt` / `requirements-anomalib.txt` — под два conda-окружения
+- `requirements-kaggle.txt` — единое окружение Kaggle с PyTorch для Tesla P100
 
 ## Тесты
 

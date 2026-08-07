@@ -1,7 +1,7 @@
 # Пути внутри Kaggle Notebook. При другом slug подключённого Dataset
 # достаточно исправить только эти две строки.
-mvtec_path: /kaggle/input/mvtec-ad/mvtec_anomaly_detection
-dtd_images_path: /kaggle/input/describable-textures-dataset-dtd/dtd/images
+mvtec_path: /kaggle/input/datasets/ipythonx/mvtec-ad
+dtd_images_path: /kaggle/input/datasets/jmexpert/describable-textures-dataset-dtd/dtd/images
 
 # Kaggle использует одно окружение с CUDA. Разделение сохранено под теми же
 # логическими именами, чтобы модельные конфиги оставались общими с macOS.
