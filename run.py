@@ -425,10 +425,10 @@ def run_draem(config, py, mvtec_path, dtd_path, action, dry_run):
     # тяжёлые зависимости DRAEM/torch без необходимости).
     code = (
         "import sys, json, io, contextlib; sys.path.insert(0, '.'); "
-        "import test_DRAEM; "
+        "import test_DRAEM; import torch; "
         "test_DRAEM.write_results_to_file = lambda *args, **kwargs: None; "
         "buf = io.StringIO()\n"
-        "with contextlib.redirect_stdout(buf):\n"
+        "with torch.no_grad(), contextlib.redirect_stdout(buf):\n"
         f"    test_DRAEM.test(['{category}'], '{mvtec_path}/', '{checkpoint_path}', "
         f"'{base_model_name}')\n"
         "print('===RUN_PY_CAPTURE_START===')\n"
