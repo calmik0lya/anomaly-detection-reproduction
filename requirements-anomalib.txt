@@ -1,4 +1,4 @@
 # Зависимости для conda-окружения "anomalib" (см. configs/paths/local.yaml,
-# python_envs.anomalib) — в нём запускается padim_run/ (configs/models/padim.yaml).
+# python_envs.anomalib) — в нём запускается models/padim/.
 # anomalib сам тянет за собой torch, pytorch-lightning и остальные зависимости.
 anomalib>=2.0.0

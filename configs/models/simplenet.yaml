@@ -1,6 +1,6 @@
 name: simplenet
 python_env: patchcore
-working_dir: SimpleNet
+working_dir: models/simplenet
 script: main.py
 
 seed: 0

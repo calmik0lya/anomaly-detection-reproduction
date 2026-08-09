@@ -1,5 +1,0 @@
-img_auc,DRAEM_test_0.0001_8_bs8_bottle_,0.9,0.9
-pixel_auc,DRAEM_test_0.0001_8_bs8_bottle_,0.587,0.587
-img_ap,DRAEM_test_0.0001_8_bs8_bottle_,0.97,0.97
-pixel_ap,DRAEM_test_0.0001_8_bs8_bottle_,0.317,0.317
---------------------------

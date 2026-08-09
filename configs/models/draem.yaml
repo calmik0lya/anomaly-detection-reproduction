@@ -1,6 +1,6 @@
 name: draem
 python_env: patchcore
-working_dir: DRAEM
+working_dir: models/draem
 train_script: train_DRAEM.py
 
 epochs: 8

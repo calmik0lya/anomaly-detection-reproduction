@@ -24,7 +24,7 @@ SOFTWARE.
 
 Note: this license covers the wrapper/orchestration code added in this
 repository (run.py, configs/, tests/) and original documentation (README.md,
-results.md). The vendored model implementations in patchcore-inspection/,
-SimpleNet/, STFPM/, DRAEM/ and the anomalib dependency used by padim_run/ each
+results.md). The vendored model implementations under models/ and the anomalib
+dependency used by PaDiM each
 keep their own upstream licenses (see the LICENSE file inside each of those
 directories).

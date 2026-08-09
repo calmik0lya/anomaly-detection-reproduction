@@ -20,11 +20,12 @@
 ├── requirements*.txt
 ├── results.md                 # метрики + сравнение со статьями
 ├── TODO.md
-├── patchcore-inspection/       # PatchCore
-├── padim_run/                  # PaDiM (anomalib)
-├── STFPM/
-├── SimpleNet/
-└── DRAEM/
+└── models/                   # оригинальные реализации без изменения логики
+    ├── patchcore/
+    ├── padim/
+    ├── stfpm/
+    ├── simplenet/
+    └── draem/
 ```
 
 ## Conda-окружения
@@ -33,6 +34,10 @@
 - `anomalib` — PaDiM (свой тяжёлый стек: pytorch-lightning, kornia)
 
 Пути к интерпретаторам — в `configs/paths/local.yaml`, `run.py` вызывает их сам.
+
+Пять внешних реализаций собраны под `models/`, поэтому корень проекта содержит
+только общую ML-обвязку. Их алгоритмический код не объединён и не переписан:
+единый интерфейс обеспечивают `run.py` и YAML-конфиги.
 
 ## Запуск
 

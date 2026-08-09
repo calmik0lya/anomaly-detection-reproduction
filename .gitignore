@@ -17,12 +17,16 @@ patchcore_params.pkl
 
 # Heavy run outputs (keep only the small metrics/csv/txt summaries manually)
 /experiments/
-patchcore-inspection/results_*/
-SimpleNet/results_*/
-padim_run/results/**/weights/
-padim_run/results/**/images/
-patchcore-inspection/results_bottle/**/models/
-SimpleNet/results_bottle/**/models/
+models/patchcore/results_*/
+models/simplenet/results_*/
+models/draem/outputs/
+models/padim/metrics.json
+models/padim/results/**/weights/
+models/padim/results/**/images/
+models/padim/results/**/latest
+models/patchcore/models/**/results.csv
+models/patchcore/results_bottle/**/models/
+models/simplenet/results_bottle/**/models/
 
 # Python
 __pycache__/
@@ -31,4 +35,4 @@ __pycache__/
 
 # OS / misc
 .DS_Store
-patchcore-inspection/.claude/
+models/patchcore/.claude/

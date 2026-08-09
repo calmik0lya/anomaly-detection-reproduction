@@ -1,6 +1,6 @@
 name: padim
 python_env: anomalib
-working_dir: padim_run
+working_dir: models/padim
 script: run_padim.py
 env: {}
 

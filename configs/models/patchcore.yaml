@@ -1,6 +1,6 @@
 name: patchcore
 python_env: patchcore
-working_dir: patchcore-inspection
+working_dir: models/patchcore
 script: bin/run_patchcore.py
 
 seed: 0

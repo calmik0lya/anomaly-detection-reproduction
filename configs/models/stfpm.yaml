@@ -1,6 +1,6 @@
 name: stfpm
 python_env: patchcore
-working_dir: STFPM
+working_dir: models/stfpm
 script: main.py
 
 epochs: 100
