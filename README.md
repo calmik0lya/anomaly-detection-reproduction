@@ -1,88 +1,132 @@
-Воспроизведение пяти методов anomaly detection на 15 категориях MVTec AD: PatchCore, PaDiM, STFPM, SimpleNet, DRAEM. Каждая модель — клон оригинального репозитория с точечными правками, логика моделей не переписана. Локально можно проверять код на CPU/macOS, полные эксперименты рассчитаны на NVIDIA GPU в Kaggle.
+# Воспроизведение методов anomaly detection на MVTec AD
 
-## Структура
+В репозитории воспроизведены пять методов промышленного поиска аномалий:
+**PatchCore, PaDiM, STFPM, SimpleNet и DRAEM**. Эксперименты проведены на всех
+15 категориях MVTec AD — всего 75 пар «модель/категория».
 
-```
+Исходная логика моделей не объединялась и не переписывалась. Каждая реализация
+находится в `models/`, а общая обвязка отвечает за конфигурацию, запуск и
+одинаковое сохранение результатов. Полные прогоны выполнялись на NVIDIA Tesla
+P100 в Kaggle; локально проект можно использовать для проверки конфигов, тестов
+и отдельных запусков.
+
+## Что уже реализовано
+
+- все параметры экспериментов вынесены в YAML;
+- поддержан одиночный запуск модели и полный прогон по 15 категориям;
+- завершённые эксперименты можно пропускать с помощью `--resume`;
+- после каждого успешного запуска вместе сохраняются использованный конфиг,
+  итоговые метрики и найденные веса;
+- метрики всех запусков собираются в общую CSV- и Markdown-таблицу;
+- для Kaggle подготовлен отдельный Notebook с проверкой GPU и восстановлением
+  результатов предыдущей сессии.
+
+## Структура проекта
+
+```text
 .
-├── run.py                    # сборка YAML-конфигов и запуск моделей
-├── sweep.py                  # пакетный запуск 15 категорий с resume
-├── aggregate_results.py      # сводная CSV/Markdown-таблица метрик
-├── kaggle/                   # готовый Kaggle Notebook
+├── run.py                  # запуск одной модели по YAML-конфигу
+├── sweep.py                # последовательный запуск моделей и категорий
+├── aggregate_results.py    # сбор метрик из experiment-папок
 ├── configs/
-│   ├── config.yaml          # группы по умолчанию
-│   ├── models/              # гиперпараметры и веса каждой модели
-│   ├── tasks/               # постановка anomaly detection
-│   ├── metrics/             # источники и парсинг метрик
-│   ├── runner/              # параметры папки экспериментов
-│   └── paths/               # датасеты и Python-окружения
-├── experiments/               # результаты запусков: config/metrics/weights
-├── tests/                     # pytest
-├── requirements*.txt
-├── results.md                 # метрики + сравнение со статьями
-├── TODO.md
-└── models/                   # оригинальные реализации без изменения логики
-    ├── patchcore/
-    ├── padim/
-    ├── stfpm/
-    ├── simplenet/
-    └── draem/
+│   ├── config.yaml         # состав эксперимента по умолчанию
+│   ├── models/             # гиперпараметры пяти моделей и weight_glob
+│   ├── tasks/              # задача и список 15 категорий MVTec AD
+│   ├── metrics/            # правила извлечения метрик
+│   ├── runner/             # общие параметры запуска
+│   └── paths/              # локальные и Kaggle-пути
+├── models/                 # исходные реализации моделей
+├── kaggle/                 # Notebook для запуска на GPU
+├── experiments/            # config.yaml, metrics.json и weights каждого запуска
+├── outputs/                # итоговые Excel-таблицы
+├── tests/                  # тесты конфигов, команд и агрегации
+└── results.md              # сводка результатов
 ```
 
-## Conda-окружения
+Тяжёлые веса и experiment-папки не хранятся в Git. После обучения они были
+сохранены в приватных Kaggle Datasets, а в репозитории остаются код, конфиги и
+инструменты для полного воспроизведения.
 
-- `patchcore` — PatchCore, STFPM, SimpleNet, DRAEM
-- `anomalib` — PaDiM (свой тяжёлый стек: pytorch-lightning, kornia)
+## Как устроены конфиги
 
-Пути к интерпретаторам — в `configs/paths/local.yaml`, `run.py` вызывает их сам.
+Корневой `configs/config.yaml` собирает эксперимент из нескольких независимых
+частей:
 
-Пять внешних реализаций собраны под `models/`, поэтому корень проекта содержит
-только общую ML-обвязку. Их алгоритмический код не объединён и не переписан:
-единый интерфейс обеспечивают `run.py` и YAML-конфиги.
+- `tasks/anomaly_detection.yaml` — категория, действие и полный список классов;
+- `models/<model>.yaml` — архитектура, epochs, batch size и остальные параметры;
+- `metrics/<model>.yaml` — откуда и как извлекать метрики;
+- `runner/default.yaml` — папка результатов;
+- `paths/local.yaml` или `paths/kaggle.yaml` — датасеты и Python-окружения.
 
-## Запуск
+В конфиге каждой модели есть `weight_glob`. По этим шаблонам `run.py` находит
+реальные checkpoint-файлы исходной реализации и копирует их в папку
+эксперимента.
+
+## Запуск одной модели
 
 ```bash
-python run.py --config configs/config.yaml
 python run.py --config configs/models/patchcore.yaml
-python run.py --config configs/models/stfpm.yaml --epochs 50
+python run.py --config configs/models/stfpm.yaml --category cable --epochs 50
 python run.py --config configs/models/draem.yaml --category carpet --action test
 ```
 
-`configs/config.yaml` выбирает группы по умолчанию. Переданный файл из `configs/models/`
-заменяет модель и подключает одноимённый конфиг из `configs/metrics/`.
-`--category`, `--epochs`, `--action` переопределяют собранный конфиг, а `--dry-run`
-печатает команду без запуска.
+Параметры `--category`, `--epochs` и `--action` переопределяют значения YAML.
+Полезные дополнительные флаги:
 
-`--paths` выбирает другой набор путей, `--device cuda` включает GPU через разные
-CLI-интерфейсы моделей, а `--output-dir` задаёт место сохранения экспериментов.
+- `--paths configs/paths/kaggle.yaml` — выбрать другой набор путей;
+- `--device cuda` — запустить модель на GPU;
+- `--output-dir experiments` — изменить папку экспериментов;
+- `--dry-run` — показать итоговую команду без запуска.
 
-Параметры PaDiM (путь к MVTec AD, category, backbone, layers, batch size и epochs)
-также берутся из YAML, несмотря на отдельное окружение `anomalib`.
+## Запуск всех 15 категорий
 
-## Результаты запусков
+```bash
+python sweep.py \
+  --paths configs/paths/kaggle.yaml \
+  --device cuda \
+  --output-dir /kaggle/working/experiments \
+  --resume \
+  --continue-on-error
+```
 
-После успешного реального запуска создаётся
-`experiments/<model>__<category>__<timestamp>/`:
+По умолчанию `sweep.py` последовательно запускает пять моделей на всех категориях.
+При необходимости можно выбрать только часть матрицы:
+
+```bash
+python sweep.py \
+  --models patchcore stfpm \
+  --categories bottle cable capsule \
+  --paths configs/paths/kaggle.yaml \
+  --device cuda \
+  --resume
+```
+
+`--resume` проверяет непустой `metrics.json` и не повторяет уже завершённые пары.
+Текущее состояние записывается в `experiments/sweep_state.json`.
+
+## Результат каждого запуска
+
+После успешного обучения и тестирования создаётся отдельная папка с моделью,
+категорией и временем запуска:
 
 ```text
-experiments/stfpm__bottle__20260806_194545/
+experiments/stfpm__bottle__20260807_152039/
 ├── config.yaml
 ├── metrics.json
 └── weights/
     └── best.pth.tar
 ```
 
-- `config.yaml` — полностью собранный конфиг (`task/model/metrics/runner/paths`)
-- `metrics.json` — метрики из results.csv/лога модели
-- `weights/` — только файлы весов, найденные по `weight_glob`, без лишних вложенных папок
+- `config.yaml` — фактически использованные task/model/metrics/runner/paths;
+- `metrics.json` — итоговые image-AUROC, pixel-AUROC и другие доступные метрики;
+- `weights/` — веса, найденные по `weight_glob`, без лишней структуры каталогов.
 
-При `--dry-run` или ошибке модели ложный успешный эксперимент не создаётся. Для
-`--action train` без последующего тестирования `metrics.json` остаётся пустым до
-получения итоговых метрик.
+При ошибке модели папка успешного эксперимента не создаётся. `--dry-run` также
+ничего не сохраняет.
 
-`experiments/` хранится локально и исключён из Git, как и тяжёлые outputs/checkpoints в типовых ML-проектах. Исходные конфиги из `configs/` остаются в репозитории.
+## Сводная таблица метрик
 
-После восстановления experiment-папок сводная таблица строится одной командой:
+После восстановления experiment-папок результаты собираются одной командой:
 
 ```bash
 python aggregate_results.py \
@@ -91,40 +135,43 @@ python aggregate_results.py \
   --markdown results.md
 ```
 
-Скрипт игнорирует незавершённые папки и при повторных запусках берёт последний
-успешный результат каждой пары модель/категория. `results.csv` удобен для анализа
-в Excel, а `results.md` — для просмотра итогов непосредственно на GitHub.
+Скрипт берёт последний успешный запуск каждой пары «модель/категория», пропускает
+повреждённые и незавершённые папки, рассчитывает средние значения по категориям и
+формирует подробную таблицу. Результаты этого проекта и значения из статей
+сравниваются как средние по всем 15 категориям MVTec AD.
 
-## Kaggle и запуск 15 категорий
+Готовые таблицы находятся в `outputs/`:
 
-Готовый Notebook: [`kaggle/anomaly_detection_mvtec.ipynb`](kaggle/anomaly_detection_mvtec.ipynb).
-В Kaggle нужно включить GPU и подключить Dataset `ipythonx/mvtec-ad`. DTD нужен
-только перед запуском DRAEM. Notebook устанавливает совместимую с Tesla P100
-сборку PyTorch из `requirements-kaggle.txt`, проверяет CUDA и сначала запускает
-одну пару PatchCore/bottle.
+- [`Результаты_5_моделей_15_категорий.xlsx`](outputs/results-table/Результаты_5_моделей_15_категорий.xlsx) — сравнение средних метрик;
+- [`Литературный_обзор_20_статей.xlsx`](outputs/literature-review/Литературный_обзор_20_статей.xlsx) — обзор связанных методов и исследований.
 
-Полный последовательный запуск:
+## Kaggle
 
-```bash
-python sweep.py \
-  --paths configs/paths/kaggle.yaml \
-  --device cuda \
-  --output-dir /kaggle/working/experiments \
-  --resume --continue-on-error
-```
+Готовый Notebook находится в
+[`kaggle/anomaly_detection_mvtec.ipynb`](kaggle/anomaly_detection_mvtec.ipynb).
+Перед запуском нужно включить GPU и подключить MVTec AD. Датасет DTD требуется
+только для DRAEM, где его текстуры используются для создания синтетических
+дефектов.
 
-`--resume` ищет непустой `metrics.json` и пропускает уже завершённые пары.
-Текущее состояние записывается в `experiments/sweep_state.json`. Из-за лимита
-сессии разумно запускать модели группами, например `--models patchcore padim`,
-сохранять Kaggle Version вместе с output и продолжать той же командой. В новой
-сессии предыдущий output нужно подключить как Dataset; Notebook содержит ячейку,
-которая восстанавливает experiment-папки в `/kaggle/working/experiments`.
+Из-за ограничения длительности Kaggle-сессии модели удобно запускать группами.
+После каждой группы результаты следует сохранять как приватный Kaggle Dataset. В
+новой сессии Notebook восстанавливает experiment-папки, после чего та же команда
+с `--resume` продолжает вычисления.
 
-## Зависимости
+## Окружения и зависимости
 
-- `requirements.txt` — для запуска `run.py` и тестов (PyYAML, pytest)
-- `requirements-patchcore.txt` / `requirements-anomalib.txt` — под два conda-окружения
-- `requirements-kaggle.txt` — единое окружение Kaggle с PyTorch для Tesla P100
+Локально используются два окружения:
+
+- `patchcore` — PatchCore, STFPM, SimpleNet и DRAEM;
+- `anomalib` — PaDiM.
+
+Пути к их интерпретаторам задаются в `configs/paths/local.yaml`. В Kaggle все
+модели запускаются в одном GPU-окружении.
+
+- `requirements.txt` — зависимости общей обвязки и тестов;
+- `requirements-patchcore.txt` — зависимости первого локального окружения;
+- `requirements-anomalib.txt` — стек PaDiM/anomalib;
+- `requirements-kaggle.txt` — совместимое окружение для Kaggle Tesla P100.
 
 ## Тесты
 
@@ -133,7 +180,7 @@ pip install -r requirements.txt
 pytest
 ```
 
-Проверяют валидность всех групп в `configs/`, композицию полного конфига для каждой
-модели, подстановку параметров в команду и агрегацию метрик — без GPU и датасета.
+Тесты не требуют GPU и MVTec AD. Они проверяют структуру YAML, сборку полного
+конфига, подстановку параметров в команды, шаблоны весов и агрегацию метрик.
 
-Открытые задачи — в `TODO.md`.
+Открытые задачи перечислены в [`TODO.md`](TODO.md).
